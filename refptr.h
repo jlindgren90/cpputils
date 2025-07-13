@@ -47,7 +47,9 @@ T &assign_from(T &t, V &&v)
  */
 template<typename T>
 struct refptr {
-    explicit refptr(T *ptr = nullptr) : m_ptr(ptr)
+    refptr() : m_ptr(nullptr) {}
+
+    explicit refptr(T *ptr) : m_ptr(ptr)
     {
         if (m_ptr) {
             m_ptr->m_refcount++;
