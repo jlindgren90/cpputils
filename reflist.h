@@ -50,12 +50,12 @@
  *    supported. (It's possible to emulate insertion by removing and
  *    re-adding all the items after the insertion point.)
  *
- * 2. The list must not be destroyed nor moved while iterators exist.
+ * 2. None of the following may be called while any iterators exist:
+ *      - ~reflist()
+ *      - operator=()
+ *      - clear()
  *
- * 3. Copy-construct and copy-assign operators are not provided. If you
- *    really want an item-by-item copy, see append_all().
- *
- * 4. Currently, only non-const iterators are provided.
+ * 3. Currently, only non-const iterators are provided.
  */
 template<typename T>
 struct reflist : public refcounted<reflist<T>> {
@@ -142,6 +142,13 @@ struct reflist : public refcounted<reflist<T>> {
 
     reflist() {}
 
+    reflist(const reflist &list)
+    {
+        // this produces a compacted copy (nulls omitted)
+        append_all(const_cast<reflist &>(list).begin(),
+                   const_cast<reflist &>(list).end());
+    }
+
     reflist(reflist &&list)
     {
         assert(list.refcount() == 0);
@@ -150,6 +157,8 @@ struct reflist : public refcounted<reflist<T>> {
         m_cached_size = list.m_cached_size;
         list.m_cached_size = 0;
     }
+
+    reflist &operator=(const reflist &list) { return assign_from(*this, list); }
 
     reflist &operator=(reflist &&list)
     {
@@ -167,6 +176,10 @@ struct reflist : public refcounted<reflist<T>> {
     iter rend() { return iter(this, start_idx() - 1, -1); }
 
     reverse_view reversed() { return reverse_view(this); }
+
+    int size() { return std::distance(begin(), end()); }
+
+    void clear() { *this = reflist(); }
 
     template<typename V>
     void append(V &&val)
