@@ -47,27 +47,11 @@ T &assign_from(T &t, V &&v)
  */
 template<typename T>
 struct refptr {
-    refptr() : m_ptr(nullptr) {}
-
-    explicit refptr(T *ptr) : m_ptr(ptr)
-    {
-        if (m_ptr) {
-            m_ptr->m_refcount++;
-        }
-    }
-
-    refptr(const refptr &rp) : refptr(rp.m_ptr) {}
+    refptr() {}
+    explicit refptr(T *ptr) { reset(ptr); }
+    refptr(const refptr &rp) { reset(rp.m_ptr); }
     refptr(refptr &&rp) : m_ptr(rp.m_ptr) { rp.m_ptr = nullptr; }
-
-    ~refptr()
-    {
-        if (m_ptr) {
-            m_ptr->m_refcount--;
-            if (!m_ptr->m_refcount) {
-                m_ptr->last_unref();
-            }
-        }
-    }
+    ~refptr() { reset(); }
 
     refptr &operator=(const refptr &rp) { return assign_from(*this, rp); }
     refptr &operator=(refptr &&rp) { return assign_from(*this, std::move(rp)); }
@@ -84,8 +68,22 @@ struct refptr {
     bool operator!=(T *ptr) const { return m_ptr != ptr; }
     bool operator!=(const refptr &rp) const { return m_ptr != rp.m_ptr; }
 
+    void reset(T *ptr = nullptr)
+    {
+        if (ptr) {
+            ptr->m_refcount++;
+        }
+        if (m_ptr) {
+            m_ptr->m_refcount--;
+            if (!m_ptr->m_refcount) {
+                m_ptr->last_unref();
+            }
+        }
+        m_ptr = ptr;
+    }
+
 private:
-    T *m_ptr;
+    T *m_ptr = nullptr;
 };
 
 /* Mix-in for a reference-counted type */
@@ -94,11 +92,14 @@ struct refcounted {
     friend refptr<T>;
 
     refcounted() {}
+    ~refcounted() { assert(m_refcount == 0); }
 
+    // The mix-in itself does not support copy/move, since the refcount
+    // is not transferable. A derived class may implement copy/move if
+    // desired, but remember that after copying/moving, any existing
+    // refptrs will still point to the original object.
     refcounted(const refcounted &) = delete;
     refcounted &operator=(const refcounted &) = delete;
-
-    ~refcounted() { assert(m_refcount == 0); }
 
     unsigned refcount() const { return m_refcount; }
 
