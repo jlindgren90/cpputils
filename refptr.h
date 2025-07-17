@@ -110,6 +110,12 @@ private:
     unsigned m_refcount = 0;
 };
 
+/* Specialization where last_unref() deletes the object */
+template<typename T>
+struct ref_owned : public refcounted<T> {
+    void last_unref() { delete static_cast<T *>(this); }
+};
+
 /*
  * Generic intrusive weak pointer.
  *

@@ -11,16 +11,11 @@
     }                                   \
 } while (0)
 
-struct test : public refcounted<test> {
+struct test : public ref_owned<test> {
     std::string val;
 
     test(const std::string &val) : val(val) {}
-
-    void last_unref()
-    {
-        std::cout << "destroy: " << val << "\n";
-        delete this;
-    }
+    ~test() { std::cout << "destroy: " << val << "\n"; }
 };
 
 std::string to_str(reflist<test> &list)
