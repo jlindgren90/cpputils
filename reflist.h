@@ -58,10 +58,14 @@
  * 3. Currently, only non-const iterators are provided.
  */
 template<typename T>
-struct reflist : public refcounted<reflist<T>> {
+class reflist : public refcounted<reflist<T>>
+{
+public:
     friend refptr<reflist>;
 
-    struct iter {
+    class iter
+    {
+    public:
         friend reflist;
 
         // std::iterator_traits
@@ -76,7 +80,7 @@ struct reflist : public refcounted<reflist<T>> {
 
         bool operator==(const iter &it)
         {
-            // comparing different lists or directions is ill-defined
+            // can't compare different lists or directions
             assert(m_list == it.m_list && m_dir == it.m_dir);
             // intentionally comparing only index (not start or end)
             return m_idx == it.m_idx;
@@ -113,22 +117,26 @@ struct reflist : public refcounted<reflist<T>> {
                 while (idx < m_end && !m_list->at(idx)) {
                     idx++;
                 }
-                // use INT_MAX - 1 so all past-end iters are equal
-                // (while allowing one increment without overflow)
+                // use INT_MAX - 1 so all past-end iters
+                // are equal (while allowing one increment
+                // without overflow)
                 return (idx < m_end) ? idx : INT_MAX - 1;
             } else {
                 idx = std::min(idx, m_end - 1);
                 while (idx >= m_start && !m_list->at(idx)) {
                     idx--;
                 }
-                // use INT_MIN + 1 so all pre-start iters are equal
-                // (while allowing one decrement without overflow)
+                // use INT_MIN + 1 so all pre-start iters
+                // are equal (while allowing one decrement
+                // without overflow)
                 return (idx >= m_start) ? idx : INT_MIN + 1;
             }
         }
     };
 
-    struct reverse_view {
+    class reverse_view
+    {
+    public:
         friend reflist;
 
         iter begin() { return m_list->rbegin(); }

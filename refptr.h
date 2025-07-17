@@ -46,12 +46,15 @@ T &assign_from(T &t, V &&v)
  * It is an error to destroy an object while refptrs to it exist.
  */
 template<typename T>
-struct refptr {
+class refptr
+{
+public:
     refptr() {}
-    explicit refptr(T *ptr) { reset(ptr); }
     refptr(const refptr &rp) { reset(rp.m_ptr); }
     refptr(refptr &&rp) : m_ptr(rp.m_ptr) { rp.m_ptr = nullptr; }
     ~refptr() { reset(); }
+
+    explicit refptr(T *ptr) { reset(ptr); }
 
     refptr &operator=(const refptr &rp) { return assign_from(*this, rp); }
     refptr &operator=(refptr &&rp) { return assign_from(*this, std::move(rp)); }
@@ -88,7 +91,9 @@ private:
 
 /* Mix-in for a reference-counted type */
 template<typename T>
-struct refcounted {
+class refcounted
+{
+public:
     friend refptr<T>;
 
     refcounted() {}
@@ -112,7 +117,9 @@ private:
 
 /* Specialization where last_unref() deletes the object */
 template<typename T>
-struct ref_owned : public refcounted<T> {
+class ref_owned : public refcounted<T>
+{
+public:
     void last_unref() { delete static_cast<T *>(this); }
 };
 
@@ -123,14 +130,17 @@ struct ref_owned : public refcounted<T> {
  * The pointed-to type needs to inherit the "weak_target" mix-in.
  */
 template<typename T>
-struct weakptr {
+class weakptr
+{
+public:
     weakptr() {}
-    explicit weakptr(T *ptr) { reset(ptr); }
-    weakptr(const weakptr &rp) { reset(rp.m_ptr); }
+    weakptr(const weakptr &wp) { reset(wp.m_ptr); }
     // move constructor omitted (cannot be moved efficiently)
     ~weakptr() { reset(); }
 
-    weakptr &operator=(const weakptr &rp) { return assign_from(*this, rp); }
+    explicit weakptr(T *ptr) { reset(ptr); }
+
+    weakptr &operator=(const weakptr &wp) { return assign_from(*this, wp); }
     // move assignment omitted (cannot be moved efficiently)
 
     T *get() const { return m_ptr; }
@@ -141,18 +151,18 @@ struct weakptr {
     explicit operator bool() const { return (bool)m_ptr; }
 
     bool operator==(T *ptr) const { return m_ptr == ptr; }
-    bool operator==(const weakptr &rp) const { return m_ptr == rp.m_ptr; }
+    bool operator==(const weakptr &wp) const { return m_ptr == wp.m_ptr; }
     bool operator!=(T *ptr) const { return m_ptr != ptr; }
-    bool operator!=(const weakptr &rp) const { return m_ptr != rp.m_ptr; }
+    bool operator!=(const weakptr &wp) const { return m_ptr != wp.m_ptr; }
 
     void reset(T *ptr = nullptr)
     {
         if (m_ptr) {
             // remove from linked list
-            if (m_ptr->head == this) {
-                m_ptr->head = this->next;
+            if (m_ptr->m_weak_head == this) {
+                m_ptr->m_weak_head = this->next;
             } else {
-                auto prior = m_ptr->head;
+                auto prior = m_ptr->m_weak_head;
                 while (prior->next != this) {
                     prior = prior->next;
                 }
@@ -162,8 +172,8 @@ struct weakptr {
         m_ptr = ptr;
         if (ptr) {
             // add to linked list
-            this->next = ptr->head;
-            ptr->head = this;
+            this->next = ptr->m_weak_head;
+            ptr->m_weak_head = this;
         } else {
             this->next = nullptr;
         }
@@ -176,15 +186,17 @@ private:
 
 /* Mix-in for a weak pointer target type */
 template<typename T>
-struct weak_target {
+class weak_target
+{
+public:
     friend weakptr<T>;
 
     weak_target() {}
 
     ~weak_target()
     {
-        while (head) {
-            head->reset();
+        while (m_weak_head) {
+            m_weak_head->reset();
         }
     }
 
@@ -196,7 +208,7 @@ struct weak_target {
     weak_target &operator=(const weak_target &) = delete;
 
 private:
-    weakptr<T> *head = nullptr; // linked list
+    weakptr<T> *m_weak_head = nullptr; // linked list
 };
 
 #endif // REFPTR_H
