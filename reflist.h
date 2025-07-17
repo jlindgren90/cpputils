@@ -212,7 +212,7 @@ public:
     {
         auto it = std::find(begin(), end(), val);
         if (it != end()) {
-            *it = refptr<T>();
+            it->reset();
             return true;
         }
         return false;
