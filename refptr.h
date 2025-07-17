@@ -110,4 +110,87 @@ private:
     unsigned m_refcount = 0;
 };
 
+/*
+ * Generic intrusive weak pointer.
+ *
+ * Automatically resets to null when the pointed-to object is deleted.
+ * The pointed-to type needs to inherit the "weak_target" mix-in.
+ */
+template<typename T>
+struct weakptr {
+    weakptr() {}
+    explicit weakptr(T *ptr) { reset(ptr); }
+    weakptr(const weakptr &rp) { reset(rp.m_ptr); }
+    // move constructor omitted (cannot be moved efficiently)
+    ~weakptr() { reset(); }
+
+    weakptr &operator=(const weakptr &rp) { return assign_from(*this, rp); }
+    // move assignment omitted (cannot be moved efficiently)
+
+    T *get() const { return m_ptr; }
+
+    T &operator*() const { return *m_ptr; }
+    T *operator->() const { return m_ptr; }
+
+    explicit operator bool() const { return (bool)m_ptr; }
+
+    bool operator==(T *ptr) const { return m_ptr == ptr; }
+    bool operator==(const weakptr &rp) const { return m_ptr == rp.m_ptr; }
+    bool operator!=(T *ptr) const { return m_ptr != ptr; }
+    bool operator!=(const weakptr &rp) const { return m_ptr != rp.m_ptr; }
+
+    void reset(T *ptr = nullptr)
+    {
+        if (m_ptr) {
+            // remove from linked list
+            if (m_ptr->head == this) {
+                m_ptr->head = this->next;
+            } else {
+                auto prior = m_ptr->head;
+                while (prior->next != this) {
+                    prior = prior->next;
+                }
+                prior->next = this->next;
+            }
+        }
+        m_ptr = ptr;
+        if (ptr) {
+            // add to linked list
+            this->next = ptr->head;
+            ptr->head = this;
+        } else {
+            this->next = nullptr;
+        }
+    }
+
+private:
+    T *m_ptr = nullptr;
+    weakptr<T> *next = nullptr;
+};
+
+/* Mix-in for a weak pointer target type */
+template<typename T>
+struct weak_target {
+    friend weakptr<T>;
+
+    weak_target() {}
+
+    ~weak_target()
+    {
+        while (head) {
+            head->reset();
+        }
+    }
+
+    // The mix-in itself does not support copy/move, since the weakptrs
+    // would be left dangling. A derived class may implement copy/move
+    // if desired, but remember that after copying/moving, any existing
+    // weakptrs will still point to the original object.
+    weak_target(const weak_target &) = delete;
+    weak_target &operator=(const weak_target &) = delete;
+
+private:
+    weakptr<T> *head = nullptr; // linked list
+};
+
 #endif // REFPTR_H

@@ -11,7 +11,7 @@
     }                                   \
 } while (0)
 
-struct test : public refcounted<test> {
+struct test : public refcounted<test>, public weak_target<test> {
     std::string val;
 
     test(const std::string &val) : val(val) {}
@@ -25,9 +25,9 @@ struct test : public refcounted<test> {
 
 int main(void)
 {
-    auto test1 = refptr(new test("test1"));
+    refptr test1{new test("test1")};
     auto test1b = test1;
-    auto test2 = refptr(new test("test2"));
+    refptr test2{new test("test2")};
     auto test2b = test2;
 
     TEST(test1 == test1b);
@@ -36,6 +36,16 @@ int main(void)
     TEST(test1 && test1->refcount() == 2);
     TEST(test2 && test2->refcount() == 2);
 
+    weakptr w1(test1.get());
+    auto w1b = w1;
+    weakptr w2(test2.get());
+    auto w2b = w2;
+
+    TEST(w1 && w1 == test1.get());
+    TEST(w1b && w1b == w1);
+    TEST(w2 && w2 == test2.get());
+    TEST(w2b && w2b == w2);
+
     test2 = std::move(test1);
 
     TEST(!test1);
@@ -43,6 +53,16 @@ int main(void)
 
     TEST(test1b && test1b->refcount() == 2);
     TEST(test2b && test2b->refcount() == 1);
+
+    w2 = w1;
+
+    TEST(w1 && w1b && w2 && w2b);
+    test1b.reset();
+    TEST(w1 && w1b && w2 && w2b);
+    test2.reset();
+    TEST(!w1 && !w1b && !w2 && w2b);
+    test2b.reset();
+    TEST(!w1 && !w1b && !w2 && !w2b);
 
     return 0;
 }
