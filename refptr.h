@@ -19,19 +19,8 @@
 #ifndef REFPTR_H
 #define REFPTR_H
 
+#include "util.h"
 #include <assert.h>
-#include <utility>
-
-/* Generic implementation of operator=() using constructor */
-template<typename T, typename V>
-T &assign_from(T &t, V &&v)
-{
-    if (&t != &v) {
-        t.~T();
-        new (&t) T(std::forward<V>(v));
-    }
-    return t;
-}
 
 /*
  * Generic intrusive reference-counting pointer.
@@ -56,8 +45,12 @@ public:
 
     explicit refptr(T *ptr) { reset(ptr); }
 
-    refptr &operator=(const refptr &rp) { return assign_from(*this, rp); }
-    refptr &operator=(refptr &&rp) { return assign_from(*this, std::move(rp)); }
+    refptr &operator=(const refptr &rp) { return util::reconstruct(*this, rp); }
+
+    refptr &operator=(refptr &&rp)
+    {
+        return util::reconstruct(*this, std::move(rp));
+    }
 
     T *get() const { return m_ptr; }
 
@@ -140,8 +133,10 @@ public:
 
     explicit weakptr(T *ptr) { reset(ptr); }
 
-    weakptr &operator=(const weakptr &wp) { return assign_from(*this, wp); }
-    // move assignment omitted (cannot be moved efficiently)
+    weakptr &operator=(const weakptr &wp)
+    {
+        return util::reconstruct(*this, wp);
+    }
 
     T *get() const { return m_ptr; }
 

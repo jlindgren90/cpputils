@@ -166,11 +166,14 @@ public:
         list.m_cached_size = 0;
     }
 
-    reflist &operator=(const reflist &list) { return assign_from(*this, list); }
+    reflist &operator=(const reflist &list)
+    {
+        return util::reconstruct(*this, list);
+    }
 
     reflist &operator=(reflist &&list)
     {
-        return assign_from(*this, std::move(list));
+        return util::reconstruct(*this, std::move(list));
     }
 
     iter begin() { return iter(this, start_idx(), 1); }
@@ -210,7 +213,7 @@ public:
     template<typename V>
     bool remove(const V &val)
     {
-        auto it = std::find(begin(), end(), val);
+        auto it = util::find(*this, val);
         if (it != end()) {
             it->reset();
             return true;
@@ -235,11 +238,8 @@ private:
     {
         // compact after last iter destroyed, if size changed
         if (end_idx() - start_idx() > m_cached_size) {
-            auto compact = [](auto &v) {
-                v.erase(std::remove(v.begin(), v.end(), nullptr), v.end());
-            };
-            compact(m_fwd_items);
-            compact(m_rev_items);
+            util::remove(m_fwd_items, nullptr);
+            util::remove(m_rev_items, nullptr);
             m_cached_size = end_idx() - start_idx();
         }
     }
