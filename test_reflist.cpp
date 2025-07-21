@@ -66,10 +66,9 @@ int main(void)
     TEST(to_str(list2) == "");
 
     int count = 0;
-    // calling end() repeatedly is inefficient but intentional here
-    for (auto it = list.begin(); it != list.end(); ++it) {
-        if ((*it)->val[0] >= '0' && (*it)->val[0] <= '9') {
-            list.append(std::move(*it));
+    for (auto it = list.begin(); it.valid(); ++it) {
+        if (it->val[0] >= '0' && it->val[0] <= '9') {
+            list.append(it.remove());
 
             count++;
             if (count == 1) {

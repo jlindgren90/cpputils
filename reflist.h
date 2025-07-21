@@ -75,8 +75,12 @@ public:
         using pointer = refptr<T> *;
         using reference = refptr<T> &;
 
-        refptr<T> &operator*() { return m_list->at(m_idx); }
-        refptr<T> *operator->() { return &m_list->at(m_idx); }
+        // return refptr by value (not reference) to prevent
+        // accidentally modifying the list through the iter
+        refptr<T> operator*() { return m_list->at(m_idx); }
+
+        // gives the actual item pointed to (not the refptr)
+        T *operator->() { return get(); }
 
         bool operator==(const iter &it)
         {
@@ -99,6 +103,12 @@ public:
             m_idx = skip_null(m_idx - m_dir, -m_dir);
             return *this;
         }
+
+        bool valid() { return m_idx >= m_start && m_idx < m_end; }
+
+        T *get() { return m_list->at(m_idx).get(); }
+
+        refptr<T> remove() { return std::move(m_list->at(m_idx)); }
 
     private:
         refptr<reflist> m_list;
@@ -188,6 +198,7 @@ public:
 
     reverse_view reversed() { return reverse_view(this); }
 
+    bool empty() { return begin() == end(); }
     int size() { return std::distance(begin(), end()); }
 
     void clear() { *this = reflist(); }
@@ -215,7 +226,7 @@ public:
     {
         auto it = util::find(*this, val);
         if (it != end()) {
-            it->reset();
+            it.remove();
             return true;
         }
         return false;

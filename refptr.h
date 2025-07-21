@@ -132,6 +132,7 @@ public:
     ~weakptr() { reset(); }
 
     explicit weakptr(T *ptr) { reset(ptr); }
+    explicit weakptr(const refptr<T> &rp) { reset(rp.get()); }
 
     weakptr &operator=(const weakptr &wp)
     {
@@ -147,8 +148,10 @@ public:
 
     bool operator==(T *ptr) const { return m_ptr == ptr; }
     bool operator==(const weakptr &wp) const { return m_ptr == wp.m_ptr; }
+    bool operator==(const refptr<T> &rp) const { return m_ptr == rp.get(); }
     bool operator!=(T *ptr) const { return m_ptr != ptr; }
     bool operator!=(const weakptr &wp) const { return m_ptr != wp.m_ptr; }
+    bool operator!=(const refptr<T> &rp) const { return m_ptr != rp.get(); }
 
     void reset(T *ptr = nullptr)
     {
