@@ -82,6 +82,18 @@ private:
     T *m_ptr = nullptr;
 };
 
+template<typename T>
+static inline bool operator==(T *ptr, const refptr<T> &rp)
+{
+    return rp.operator==(ptr);
+}
+
+template<typename T>
+static inline bool operator!=(T *ptr, const refptr<T> &rp)
+{
+    return rp.operator!=(ptr);
+}
+
 /* Mix-in for a reference-counted type */
 template<typename T>
 class refcounted
@@ -181,6 +193,30 @@ private:
     T *m_ptr = nullptr;
     weakptr<T> *next = nullptr;
 };
+
+template<typename T>
+static inline bool operator==(T *ptr, const weakptr<T> &wp)
+{
+    return wp.operator==(ptr);
+}
+
+template<typename T>
+static inline bool operator!=(T *ptr, const weakptr<T> &wp)
+{
+    return wp.operator!=(ptr);
+}
+
+template<typename T>
+static inline bool operator==(const refptr<T> &rp, const weakptr<T> &wp)
+{
+    return wp.operator==(rp);
+}
+
+template<typename T>
+static inline bool operator!=(const refptr<T> &rp, const weakptr<T> &wp)
+{
+    return wp.operator!=(rp);
+}
 
 /* Mix-in for a weak pointer target type */
 template<typename T>
