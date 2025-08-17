@@ -245,4 +245,23 @@ private:
     weakptr<T> *m_weak_head = nullptr; // linked list
 };
 
+/* Variant of weakptr where reset() also deletes the object */
+template<typename T>
+class weak_owner : public weakptr<T>
+{
+public:
+    weak_owner() {}
+    ~weak_owner() { reset(); }
+
+    // copy/move semantics not currently defined
+    weak_owner(const weak_owner &) = delete;
+    weak_owner &operator=(const weak_owner &) = delete;
+
+    void reset(T *ptr = nullptr)
+    {
+        delete weakptr<T>::get();
+        weakptr<T>::reset(ptr);
+    }
+};
+
 #endif // REFPTR_H
