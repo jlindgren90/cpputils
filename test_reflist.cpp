@@ -21,8 +21,8 @@ struct test : public ref_owned<test> {
 std::string to_str(reflist<test> &list)
 {
     std::string str;
-    for (auto rp : list) {
-        str += rp->val;
+    for (auto &t : list) {
+        str += t.val;
     }
     return str;
 }
@@ -30,8 +30,8 @@ std::string to_str(reflist<test> &list)
 std::string to_str_rev(reflist<test> &list)
 {
     std::string str;
-    for (auto rp : list.reversed()) {
-        str += rp->val;
+    for (auto &t : list.reversed()) {
+        str += t.val;
     }
     return str;
 }
@@ -55,7 +55,7 @@ int main(void)
     TEST(to_str(list2) == "123");
     TEST(to_str_rev(list2) == "321");
 
-    list2.append_all(list.begin(), list.end());
+    list2.append_all(list);
 
     TEST(to_str(list2) == "123abc");
     TEST(to_str_rev(list2) == "cba321");
@@ -66,7 +66,7 @@ int main(void)
     TEST(to_str(list2) == "");
 
     int count = 0;
-    for (auto it = list.begin(); it.valid(); ++it) {
+    for (auto it = list.begin(); it; ++it) {
         if (it->val[0] >= '0' && it->val[0] <= '9') {
             list.append(it.remove());
 

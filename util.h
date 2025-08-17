@@ -54,24 +54,36 @@ void remove_if(L &list, F &&func)
                list.end());
 }
 
-template<typename It, typename V>
-auto next_after(It start, It stop, const V &val, bool wrap)
+/* Find-by-address for reflist (not fully generic) */
+template<typename It, typename P>
+auto find_ptr(It start, const P &ptr)
 {
-    auto cur = std::find(start, stop, val);
-    if (cur == stop) {
+    for (; start; ++start) {
+        if (start.get() == ptr) {
+            break;
+        }
+    }
+    return start;
+}
+
+template<typename It, typename P>
+auto next_after(It start, const P &ptr, bool wrap)
+{
+    auto cur = find_ptr(start, ptr);
+    if (!cur) {
         return start;
     }
     auto next = cur;
-    if (++next == stop && wrap && cur != start) {
+    if (!(++next) && wrap && cur != start) {
         next = start;
     }
     return next;
 }
 
-template<typename It, typename V, typename F>
-auto next_after_if(It start, It stop, const V &val, bool wrap, const F &func)
+template<typename It, typename P, typename F>
+auto next_after_if(It start, It stop, const P &ptr, bool wrap, const F &func)
 {
-    auto cur = std::find(start, stop, val);
+    auto cur = find_ptr(start, ptr);
     if (cur == stop) {
         return std::find_if(start, stop, func);
     }

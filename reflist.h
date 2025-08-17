@@ -70,17 +70,15 @@ public:
 
         // std::iterator_traits
         using iterator_category = std::bidirectional_iterator_tag;
-        using value_type = refptr<T>;
+        using value_type = T;
         using difference_type = int;
-        using pointer = refptr<T> *;
-        using reference = refptr<T> &;
+        using pointer = T *;
+        using reference = T &;
 
-        // return refptr by value (not reference) to prevent
-        // accidentally modifying the list through the iter
-        refptr<T> operator*() { return m_list->at(m_idx); }
+        explicit operator bool() { return (bool)m_val; }
 
-        // gives the actual item pointed to (not the refptr)
-        T *operator->() { return get(); }
+        T &operator*() { return *m_val; }
+        T *operator->() { return m_val.get(); }
 
         bool operator==(const iter &it)
         {
@@ -94,52 +92,66 @@ public:
 
         iter &operator++()
         {
-            m_idx = skip_null(m_idx + m_dir, m_dir);
+            m_val.reset();
+            m_idx += m_dir;
+            find_valid(m_dir);
             return *this;
         }
 
         iter &operator--()
         {
-            m_idx = skip_null(m_idx - m_dir, -m_dir);
+            m_val.reset();
+            m_idx -= m_dir;
+            find_valid(m_dir);
             return *this;
         }
 
-        bool valid() { return m_idx >= m_start && m_idx < m_end; }
+        T *get() { return m_val.get(); }
 
-        T *get() { return m_list->at(m_idx).get(); }
-
-        refptr<T> remove() { return std::move(m_list->at(m_idx)); }
+        refptr<T> remove()
+        {
+            if (m_val) {
+                m_list->at(m_idx).reset();
+            }
+            return std::move(m_val);
+        }
 
     private:
         refptr<reflist> m_list;
         int m_start, m_end, m_idx, m_dir;
+        refptr<T> m_val;
 
         iter(reflist *list, int idx, int dir)
             : m_list(list), m_start(list->start_idx()), m_end(list->end_idx()),
-              m_idx(skip_null(idx, dir)), m_dir(dir)
+              m_idx(idx), m_dir(dir)
         {
+            find_valid(m_dir);
         }
 
-        int skip_null(int idx, int dir)
+        void find_valid(int dir)
         {
             if (dir > 0) {
-                idx = std::max(idx, m_start);
-                while (idx < m_end && !m_list->at(idx)) {
-                    idx++;
+                m_idx = std::max(m_idx, m_start);
+                for (; m_idx < m_end; m_idx++) {
+                    if ((m_val = m_list->at(m_idx))) {
+                        return;
+                    }
                 }
                 // use INT_MAX - 1 so all past-end iters
                 // are equal (while allowing one increment
                 // without overflow)
-                return (idx < m_end) ? idx : INT_MAX - 1;
+                m_idx = INT_MAX - 1;
             } else {
-                idx = std::min(idx, m_end - 1);
-                while (idx >= m_start && !m_list->at(idx)) {
-                    idx--;
+                m_idx = std::min(m_idx, m_end - 1);
+                for (; m_idx >= m_start; m_idx--) {
+                    if ((m_val = m_list->at(m_idx))) {
+                        return;
+                    }
                 }
                 // use INT_MIN + 1 so all pre-start iters
                 // are equal (while allowing one decrement
                 // without overflow)
-                return (idx >= m_start) ? idx : INT_MIN + 1;
+                m_idx = INT_MIN + 1;
             }
         }
     };
@@ -160,12 +172,8 @@ public:
 
     reflist() {}
 
-    reflist(const reflist &list)
-    {
-        // this produces a compacted copy (nulls omitted)
-        append_all(const_cast<reflist &>(list).begin(),
-                   const_cast<reflist &>(list).end());
-    }
+    // this produces a compacted copy (nulls omitted)
+    reflist(const reflist &list) { append_all(list); }
 
     reflist(reflist &&list)
     {
@@ -198,38 +206,35 @@ public:
 
     reverse_view reversed() { return reverse_view(this); }
 
-    bool empty() { return begin() == end(); }
+    bool empty() { return !begin(); }
     int size() { return std::distance(begin(), end()); }
 
     void clear() { *this = reflist(); }
 
-    template<typename V>
-    void append(V &&val)
+    template<typename P>
+    void append(P &&ptr)
     {
-        m_fwd_items.emplace_back(std::forward<V>(val));
+        m_fwd_items.emplace_back(std::forward<P>(ptr));
     }
 
-    template<typename It>
-    void append_all(It start, It stop)
+    void append_all(const reflist &list)
     {
-        std::copy(start, stop, std::back_inserter(m_fwd_items));
-    }
-
-    template<typename V>
-    void prepend(V &&val)
-    {
-        m_rev_items.emplace_back(std::forward<V>(val));
-    }
-
-    template<typename V>
-    bool remove(const V &val)
-    {
-        auto it = util::find(*this, val);
-        if (it != end()) {
-            it.remove();
-            return true;
+        auto &list_ = const_cast<reflist &>(list);
+        for (auto it = list_.begin(); it; ++it) {
+            m_fwd_items.emplace_back(it.get());
         }
-        return false;
+    }
+
+    template<typename P>
+    void prepend(P &&ptr)
+    {
+        m_rev_items.emplace_back(std::forward<P>(ptr));
+    }
+
+    template<typename P>
+    bool remove(const P &ptr)
+    {
+        return (bool)util::find_ptr(begin(), ptr).remove();
     }
 
 private:
