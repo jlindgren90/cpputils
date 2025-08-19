@@ -77,13 +77,13 @@ public:
 
         explicit operator bool() { return (bool)m_val; }
 
-        T &operator*() { return *m_val; }
+        T &operator*() { return *m_val.get(); }
         T *operator->() { return m_val.get(); }
 
         bool operator==(const iter &it)
         {
             // can't compare different lists or directions
-            assert(m_list == it.m_list && m_dir == it.m_dir);
+            assert(m_list.get() == it.m_list.get() && m_dir == it.m_dir);
             // intentionally comparing only index (not start or end)
             return m_idx == it.m_idx;
         }
@@ -119,12 +119,12 @@ public:
         }
 
     private:
-        refptr<reflist> m_list;
+        ref<reflist> m_list;
         int m_start, m_end, m_idx, m_dir;
         refptr<T> m_val; // not ownptr (if Ptr = ownptr)
 
-        iter(reflist *list, int idx, int dir)
-            : m_list(list), m_start(list->start_idx()), m_end(list->end_idx()),
+        iter(reflist &list, int idx, int dir)
+            : m_list(list), m_start(list.start_idx()), m_end(list.end_idx()),
               m_idx(idx), m_dir(dir)
         {
             find_valid(m_dir);
@@ -169,9 +169,9 @@ public:
         iter end() { return m_list->rend(); }
 
     private:
-        refptr<reflist> m_list;
+        ref<reflist> m_list;
 
-        reverse_view(reflist *list) : m_list(list) {}
+        reverse_view(reflist &list) : m_list(list) {}
     };
 
     reflist() {}
@@ -198,17 +198,17 @@ public:
         return util::reconstruct(*this, std::move(list));
     }
 
-    iter begin() { return iter(this, start_idx(), 1); }
-    iter end() { return iter(this, end_idx(), 1); }
+    iter begin() { return iter(*this, start_idx(), 1); }
+    iter end() { return iter(*this, end_idx(), 1); }
 
     // std::reverse_iterator is not used because its offset-by-one
     // semantics could behave unpredictably when combined with the
     // null-skipping behavior of reflist::iter (specifically, removals
     // could unexpectedly change the item an iterator points to).
-    iter rbegin() { return iter(this, end_idx() - 1, -1); }
-    iter rend() { return iter(this, start_idx() - 1, -1); }
+    iter rbegin() { return iter(*this, end_idx() - 1, -1); }
+    iter rend() { return iter(*this, start_idx() - 1, -1); }
 
-    reverse_view reversed() { return reverse_view(this); }
+    reverse_view reversed() { return reverse_view(*this); }
 
     bool empty() { return !begin(); }
     int size() { return std::distance(begin(), end()); }

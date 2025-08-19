@@ -59,8 +59,12 @@ public:
 
     T *get() const { return m_ptr; }
 
-    T &operator*() const { return *m_ptr; }
-    T *operator->() const { return m_ptr; }
+    // safer, and to be preferred over get() in most cases
+    [[nodiscard]] bool use(T *&ptr) { return (bool)(ptr = m_ptr); }
+
+    // discouraged due to making null dereference too easy
+    [[deprecated]] T &operator*() const { return *m_ptr; }
+    [[deprecated]] T *operator->() const { return m_ptr; }
 
     explicit operator bool() const { return (bool)m_ptr; }
 
@@ -85,6 +89,26 @@ public:
 
 private:
     T *m_ptr = nullptr;
+};
+
+/* More restrictive refptr which cannot be null */
+template<typename T>
+class ref : private refptr<T>
+{
+public:
+    explicit ref(T &obj) : refptr<T>(&obj) {}
+
+    ref(const ref &) = default;
+    ref &operator=(const ref &) = default;
+
+    // prevent move as it would leave the source null
+    ref(ref &&) = delete;
+    ref &operator=(ref &&) = delete;
+
+    using refptr<T>::get;
+
+    T &operator*() const { return *get(); }
+    T *operator->() const { return get(); }
 };
 
 template<typename T>
@@ -166,8 +190,12 @@ public:
 
     T *get() const { return m_ptr; }
 
-    T &operator*() const { return *m_ptr; }
-    T *operator->() const { return m_ptr; }
+    // safer, and to be preferred over get() in most cases
+    [[nodiscard]] bool use(T *&ptr) { return (bool)(ptr = m_ptr); }
+
+    // discouraged due to making null dereference too easy
+    [[deprecated]] T &operator*() const { return *m_ptr; }
+    [[deprecated]] T *operator->() const { return m_ptr; }
 
     explicit operator bool() const { return (bool)m_ptr; }
 
