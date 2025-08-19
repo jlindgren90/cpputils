@@ -21,6 +21,11 @@
 
 #include "util.h"
 #include <assert.h>
+#include <memory>
+
+/* Owning pointer (alias for std::unique_ptr) */
+template<typename T>
+using ownptr = std::unique_ptr<T>;
 
 /*
  * Generic intrusive reference-counting pointer.
@@ -118,6 +123,14 @@ public:
 
 private:
     unsigned m_refcount = 0;
+};
+
+/* Specialization where last_unref() does nothing */
+template<typename T>
+class ref_guarded : public refcounted<T>
+{
+public:
+    void last_unref() { /* no-op */ }
 };
 
 /* Specialization where last_unref() deletes the object */

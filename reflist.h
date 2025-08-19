@@ -27,10 +27,10 @@
 #include <vector>
 
 /**
- * List of refptrs, with fast append and prepend.
+ * List of smart pointers, with fast append and prepend.
  * Behaves predictably if modified during iteration.
  *
- * Items are removed by setting refptrs in the list to null. The list
+ * Items are removed by setting pointers in the list to null. The list
  * is automatically compacted to remove nulls when no iterators exist.
  *
  * Iterators behave as follows:
@@ -42,7 +42,7 @@
  *    iterator was created, and will not iterate over new items added
  *    to the list since then.
  *
- * 3. Iterators automatically skip over null refptrs.
+ * 3. Iterators automatically skip over null pointers.
  *
  * Some limitations:
  *
@@ -57,8 +57,8 @@
  *
  * 3. Currently, only non-const iterators are provided.
  */
-template<typename T>
-class reflist : public refcounted<reflist<T>>
+template<typename T, typename Ptr = refptr<T>>
+class reflist : public refcounted<reflist<T, Ptr>>
 {
 public:
     friend refptr<reflist>;
@@ -108,18 +108,20 @@ public:
 
         T *get() { return m_val.get(); }
 
-        refptr<T> remove()
+        Ptr remove()
         {
             if (m_val) {
-                m_list->at(m_idx).reset();
+                m_val.reset(); // release ref
+                return std::move(m_list->at(m_idx));
+            } else {
+                return Ptr();
             }
-            return std::move(m_val);
         }
 
     private:
         refptr<reflist> m_list;
         int m_start, m_end, m_idx, m_dir;
-        refptr<T> m_val;
+        refptr<T> m_val; // not ownptr (if Ptr = ownptr)
 
         iter(reflist *list, int idx, int dir)
             : m_list(list), m_start(list->start_idx()), m_end(list->end_idx()),
@@ -133,7 +135,8 @@ public:
             if (dir > 0) {
                 m_idx = std::max(m_idx, m_start);
                 for (; m_idx < m_end; m_idx++) {
-                    if ((m_val = m_list->at(m_idx))) {
+                    m_val.reset(m_list->at(m_idx).get());
+                    if (m_val) {
                         return;
                     }
                 }
@@ -144,7 +147,8 @@ public:
             } else {
                 m_idx = std::min(m_idx, m_end - 1);
                 for (; m_idx >= m_start; m_idx--) {
-                    if ((m_val = m_list->at(m_idx))) {
+                    m_val.reset(m_list->at(m_idx).get());
+                    if (m_val) {
                         return;
                     }
                 }
@@ -238,14 +242,14 @@ public:
     }
 
 private:
-    std::vector<refptr<T>> m_fwd_items;
-    std::vector<refptr<T>> m_rev_items; // in reverse order
+    std::vector<Ptr> m_fwd_items;
+    std::vector<Ptr> m_rev_items; // in reverse order
     int m_cached_size = 0;
 
     int start_idx() { return -(int)m_rev_items.size(); }
     int end_idx() { return m_fwd_items.size(); }
 
-    refptr<T> &at(int idx)
+    Ptr &at(int idx)
     {
         return (idx >= 0) ? m_fwd_items.at(idx) : m_rev_items.at(-1 - idx);
     }
@@ -260,5 +264,13 @@ private:
         }
     }
 };
+
+/*
+ * Variant holding owning (rather than reference-counted) pointers.
+ * Guarantees that items in the list cannot accidentally outlive the
+ * list. T still needs to inherit refcounted, but not ref_owned.
+ */
+template<typename T>
+using ownlist = reflist<T, ownptr<T>>;
 
 #endif // REFLIST_H
