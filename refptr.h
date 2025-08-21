@@ -25,7 +25,12 @@
 
 /* Owning pointer (alias for std::unique_ptr) */
 template<typename T>
-using ownptr = std::unique_ptr<T>;
+class ownptr : public std::unique_ptr<T>
+{
+public:
+    using std::unique_ptr<T>::unique_ptr;
+    explicit ownptr(T *ptr) : std::unique_ptr<T>(ptr) {}
+};
 
 /*
  * Generic intrusive reference-counting pointer.
