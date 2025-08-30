@@ -28,17 +28,18 @@ int main(void)
     TEST(test1 == test1b);
     TEST(test2 == test2b);
 
-    TEST(test1 && test1->refcount() == 2);
-    TEST(test2 && test2->refcount() == 2);
+    test *ptr1, *ptr2;
+    TEST(test1.check(ptr1) && ptr1->refcount() == 2);
+    TEST(test2.check(ptr2) && ptr2->refcount() == 2);
 
-    weakptr w1(test1.get());
+    weakptr w1(test1);
     auto w1b = w1;
-    weakptr w2(test2.get());
+    weakptr w2(test2);
     auto w2b = w2;
 
-    TEST(w1 && w1 == test1.get());
+    TEST(w1 && w1 == test1);
     TEST(w1b && w1b == w1);
-    TEST(w2 && w2 == test2.get());
+    TEST(w2 && w2 == test2);
     TEST(w2b && w2b == w2);
 
     test2 = std::move(test1);
@@ -46,8 +47,8 @@ int main(void)
     TEST(!test1);
     TEST(test2 == test1b);
 
-    TEST(test1b && test1b->refcount() == 2);
-    TEST(test2b && test2b->refcount() == 1);
+    TEST(test1b.check(ptr1) && ptr1->refcount() == 2);
+    TEST(test2b.check(ptr2) && ptr2->refcount() == 1);
 
     w2 = w1;
 
