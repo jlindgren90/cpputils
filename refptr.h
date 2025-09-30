@@ -21,28 +21,50 @@
 
 #include "util.h"
 #include <assert.h>
-#include <memory>
 #include <utility>
 
-/* Generic owning pointer (slightly modified std::unique_ptr) */
-template<typename T>
-class ownptr : public std::unique_ptr<T>
+/* Generic owning pointer (similar to std::unique_ptr) */
+template<class T, void (*deleter)(T *) = nullptr>
+class ownptr
 {
 public:
     using value_type = T;
 
-    using std::unique_ptr<T>::unique_ptr;
-    using std::unique_ptr<T>::get;
-    using std::unique_ptr<T>::reset;
+    ownptr() : m_ptr(nullptr) {}
+    ownptr(ownptr &&op) : m_ptr(op.m_ptr) { op.m_ptr = nullptr; }
+    ~ownptr() { reset(); }
 
-    explicit ownptr(T *ptr) : std::unique_ptr<T>(ptr) {}
+    explicit ownptr(T *ptr) : m_ptr(ptr) {}
 
-    // deleted due to making null dereference too easy
-    T &operator*() const = delete;
-    T *operator->() const = delete;
+    ownptr &operator=(ownptr &&op)
+    {
+        return util::reconstruct(*this, std::move(op));
+    }
+
+    explicit operator bool() const { return (bool)m_ptr; }
+
+    bool operator==(T *ptr) const { return get() == ptr; }
+    bool operator==(const ownptr &op) const { return get() == op.get(); }
+    bool operator!=(T *ptr) const { return get() != ptr; }
+    bool operator!=(const ownptr &op) const { return get() != op.get(); }
+
+    T *get() const { return m_ptr; }
 
     // safe usage pattern to prevent accidental null dereference
     [[nodiscard]] bool check(T *&ptr) { return (bool)(ptr = get()); }
+
+    void reset(T *ptr = nullptr)
+    {
+        if (m_ptr) {
+            if constexpr (deleter) {
+                deleter(m_ptr);
+            } else {
+                (void)sizeof(*m_ptr);
+                delete m_ptr;
+            }
+        }
+        m_ptr = ptr;
+    }
 
     template<typename... Args>
     T *set_new(Args &&...args)
@@ -50,7 +72,22 @@ public:
         reset(new T(std::forward<Args>(args)...));
         return get();
     }
+
+private:
+    T *m_ptr;
 };
+
+template<typename T>
+static inline bool operator==(T *ptr, const ownptr<T> &op)
+{
+    return op.operator==(ptr);
+}
+
+template<typename T>
+static inline bool operator!=(T *ptr, const ownptr<T> &op)
+{
+    return op.operator!=(ptr);
+}
 
 /*
  * Common base for a counting reference (used by ref and refptr).
@@ -80,9 +117,9 @@ public:
         return util::reconstruct(*this, r);
     }
 
-    ref_base &operator=(ref_base &&rp)
+    ref_base &operator=(ref_base &&r)
     {
-        return util::reconstruct(*this, std::move(rp));
+        return util::reconstruct(*this, std::move(r));
     }
 
     T *get() const { return m_ptr; }
